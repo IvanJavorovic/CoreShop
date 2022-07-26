@@ -80,7 +80,11 @@ class Dao
 
         $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
 
-        $esQuery = $esClient->sql()->translate($params)->asArray();
+        try {
+            $esQuery = $esClient->sql()->translate($params)->asArray();
+        } catch (\Exception $exception) {
+            return [];
+        }
 
         $esQuery['size'] = $this->model->getLimit() ?? 0;
         $esQuery['from'] = $this->model->getOffset() ?? 0;

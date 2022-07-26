@@ -271,7 +271,7 @@ class ElasticsearchWorker extends AbstractWorker
                     'body' => [
                         'settings' => [
                             "number_of_shards" => 5,
-                            "number_of_replicas" => 0
+                            "number_of_replicas" => 0,
                         ]
                     ]
                 ]
@@ -298,8 +298,8 @@ class ElasticsearchWorker extends AbstractWorker
             'type' => "coreshop",
             'include_type_name' => true,
             'body'  => [
-                'properties' => $properties
-            ]
+                'properties' => $properties,
+            ],
         ];
 
         try {
