@@ -144,7 +144,7 @@ class Dao
         $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
 
         return array_map(function (array $mappedData) use ($fieldName) {
-            return str_replace(',', '', $mappedData[$fieldName]);
+            return str_replace(',', '', (string)$mappedData[$fieldName]);
         }, $mappedResults);
     }
 
