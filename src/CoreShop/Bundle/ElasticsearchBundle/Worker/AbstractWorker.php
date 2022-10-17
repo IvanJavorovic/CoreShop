@@ -76,6 +76,8 @@ abstract class AbstractWorker implements WorkerInterface
         \Pimcore::unsetAdminMode();
         $hidePublishedMemory = AbstractObject::doHideUnpublished();
         AbstractObject::setHideUnpublished(false);
+        $oldGetInheritedValues = AbstractObject::getGetInheritedValues();
+        AbstractObject::setGetInheritedValues(true);
 
         $extensions = $this->getExtensions($index);
 
@@ -172,6 +174,7 @@ abstract class AbstractWorker implements WorkerInterface
         }
 
         AbstractObject::setHideUnpublished($hidePublishedMemory);
+        AbstractObject::setGetInheritedValues($oldGetInheritedValues);
 
         return $result;
     }

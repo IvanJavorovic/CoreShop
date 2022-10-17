@@ -27,9 +27,7 @@ use CoreShop\Component\Index\Model\IndexInterface;
 use CoreShop\Component\Index\Order\OrderRendererInterface;
 use CoreShop\Component\Index\Worker\FilterGroupHelperInterface;
 use CoreShop\Component\Registry\ServiceRegistryInterface;
-use Doctrine\DBAL\Types\Type;
 use Pimcore\Db\Connection;
-use Pimcore\Log\Simple;
 use Pimcore\Tool;
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
@@ -449,6 +447,7 @@ class ElasticsearchWorker extends AbstractWorker
 
     protected function doInsertData(string $tableName, array $data, string $objectId): void
     {
+
         $params = [
             'index' => $tableName,
             'type' => 'coreshop',
@@ -489,7 +488,9 @@ class ElasticsearchWorker extends AbstractWorker
                 $params[$column->getName()] = $values[$column->getName()];
             }
 
-            $this->doInsertData($this->getLocalizedTablename($index->getName()), $params, (string)$object->getId());
+            $rowId = $object->getId();
+
+            $this->doInsertData($this->getLocalizedTablename($index->getName()), $params, (string)$rowId);
         }
     }
 
@@ -542,7 +543,7 @@ class ElasticsearchWorker extends AbstractWorker
                 return "keyword";
 
             case IndexColumnInterface::FIELD_TYPE_TEXT:
-                return "keyword";
+                return "text";
         }
 
         throw new \Exception($type . " is not supported by Elasticsearch Index");

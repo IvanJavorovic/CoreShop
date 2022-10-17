@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace CoreShop\Bundle\MoneyBundle\Formatter;
 
 use CoreShop\Component\Currency\Formatter\MoneyFormatterInterface;
+use Pimcore\Log\Simple;
 use Webmozart\Assert\Assert;
 
 final class MoneyFormatter implements MoneyFormatterInterface
@@ -27,8 +28,8 @@ final class MoneyFormatter implements MoneyFormatterInterface
     {
         $formatter = new \NumberFormatter($locale, \NumberFormatter::CURRENCY);
         $formatter->setAttribute(\NumberFormatter::FRACTION_DIGITS, $fraction);
-
         $result = $formatter->formatCurrency(abs($amount / ($factor ?? $this->decimalFactor)), $currencyCode);
+
         Assert::notSame(
             false,
             $result,

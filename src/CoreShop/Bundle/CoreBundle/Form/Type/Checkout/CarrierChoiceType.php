@@ -51,7 +51,6 @@ final class CarrierChoiceType extends AbstractResourceType
                     if ($cart instanceof OrderInterface) {
                         return $this->carriersResolver->resolveCarriers($cart, $cart->getShippingAddress());
                     }
-
                     return $this->repository->findAll();
                 },
                 'choice_value' => 'id',

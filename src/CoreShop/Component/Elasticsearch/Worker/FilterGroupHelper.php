@@ -69,7 +69,7 @@ class FilterGroupHelper implements FilterGroupHelperInterface
                 $values = [];
 
                 foreach ($rawValues as $v) {
-                    $explode = explode(',', $v['value']);
+                    $explode = explode(',', (string)$v['value']);
 
                     foreach ($explode as $e) {
                         if (!$e) {

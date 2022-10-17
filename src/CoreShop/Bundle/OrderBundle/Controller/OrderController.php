@@ -624,7 +624,11 @@ class OrderController extends PimcoreController
                     continue;
                 }
                 if (is_array($detailValue)) {
-                    $detailValue = implode(', ', $detailValue);
+                    try {
+                        $detailValue = implode(', ', $detailValue);
+                    } catch (\Exception $exception) {
+                        dd($exception, $detailValue);
+                    }
                 }
 
                 if (true === is_bool($detailValue)) {
