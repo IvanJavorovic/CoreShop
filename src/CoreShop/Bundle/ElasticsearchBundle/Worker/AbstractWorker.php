@@ -32,8 +32,11 @@ use CoreShop\Component\Index\Order\OrderRendererInterface;
 use CoreShop\Component\Index\Worker\FilterGroupHelperInterface;
 use CoreShop\Component\Index\Worker\WorkerInterface;
 use CoreShop\Component\Registry\ServiceRegistryInterface;
+use CoreShop\Component\Resource\Pimcore\Model\AbstractPimcoreModel;
+use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\AbstractObject;
 use Pimcore\Model\DataObject\Concrete;
+use Pimcore\Model\DataObject\CoreShopProduct;
 use Pimcore\Tool;
 use Psr\Log\LoggerAwareTrait;
 use Webmozart\Assert\Assert;
@@ -75,9 +78,9 @@ abstract class AbstractWorker implements WorkerInterface
         $inAdmin = \Pimcore::inAdmin();
         \Pimcore::unsetAdminMode();
         $hidePublishedMemory = AbstractObject::doHideUnpublished();
-        AbstractObject::setHideUnpublished(false);
-        $oldGetInheritedValues = AbstractObject::getGetInheritedValues();
-        AbstractObject::setGetInheritedValues(true);
+        DataObject::setHideUnpublished(false);
+        $oldGetInheritedValues = DataObject::getGetInheritedValues();
+        DataObject::setGetInheritedValues(true);
 
         $extensions = $this->getExtensions($index);
 
@@ -142,7 +145,24 @@ abstract class AbstractWorker implements WorkerInterface
                     }
                 }
 
-                [$columnLocalizedData, $columnRelationData, $value, $isLocalizedValue] = $this->processInterpreter($column, $object, $value, $virtualObjectId);
+                $interpretedObject = $object;
+
+                if (empty($value)) {
+                    while (empty($value) && $interpretedObject->getType() === Concrete::OBJECT_TYPE_VARIANT) {
+                        $interpretedObject = $interpretedObject->getParent();
+
+                        if ($column->hasGetter()) {
+                            $value = $this->processGetter($column, $interpretedObject);
+                        } else {
+                            $getter = 'get' . ucfirst($column->getObjectKey());
+                            if (method_exists($interpretedObject, $getter)) {
+                                $value = $interpretedObject->$getter();
+                            }
+                        }
+                    }
+                }
+
+                [$columnLocalizedData, $columnRelationData, $value, $isLocalizedValue] = $this->processInterpreter($column, $interpretedObject, $value, $virtualObjectId);
 
                 $relationData = array_merge_recursive($relationData, $columnRelationData);
                 $localizedData = array_merge_recursive($localizedData, $columnLocalizedData);
@@ -174,7 +194,7 @@ abstract class AbstractWorker implements WorkerInterface
         }
 
         AbstractObject::setHideUnpublished($hidePublishedMemory);
-        AbstractObject::setGetInheritedValues($oldGetInheritedValues);
+        DataObject::setGetInheritedValues($oldGetInheritedValues);
 
         return $result;
     }
