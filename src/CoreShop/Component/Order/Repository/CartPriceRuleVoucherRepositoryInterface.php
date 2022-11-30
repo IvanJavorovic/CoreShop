@@ -23,7 +23,7 @@ interface CartPriceRuleVoucherRepositoryInterface extends RepositoryInterface
 {
     public function findAllPaginator(CartPriceRuleInterface $cartPriceRule, int $offset, int $limit): Paginator;
 
-    public function findByCode(string $code): ?CartPriceRuleVoucherCodeInterface;
+    public function findByCode(?string $code): ?CartPriceRuleVoucherCodeInterface;
 
     public function countCodes(int $length, ?string $prefix = null, ?string $suffix = null): int;
 }
