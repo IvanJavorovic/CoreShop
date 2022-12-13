@@ -53,6 +53,21 @@ class Dao
      */
     public function load(QueryBuilder $queryBuilder)
     {
+        $resultSet = $this->loadSet($queryBuilder);
+
+        $this->lastRecordCount = $resultSet['hits']['total']['value'];
+
+        $results = [];
+
+        foreach ($resultSet['hits']['hits'] as $hit) {
+            $results[]['o_id'] = $hit['_id'];
+        }
+
+        return $results;
+    }
+
+    public function loadSet(QueryBuilder $queryBuilder, bool $withSource = false, bool $all = false): array
+    {
         $esClient = $this->model->getWorker()->getElasticsearchClient();
 
         $queryBuilder->from($this->model->getQueryTableName(), 'q');
@@ -86,7 +101,8 @@ class Dao
             return [];
         }
 
-        $esQuery['size'] = $this->model->getLimit() ?? 0;
+        $esQuery['_source'] = $withSource;
+        $esQuery['size'] = ($withSource && $all) ? 10000 : ($this->model->getLimit() ?? 0);
         $esQuery['from'] = $this->model->getOffset() ?? 0;
         $esQuery['index'] = $this->model->getQueryTableName();
         $esQuery['type'] = "coreshop";
@@ -97,17 +113,7 @@ class Dao
         $esQuery['body']['query'] = $esQuery['query'];
         unset($esQuery['query']);
 
-        $resultSet = $esClient->search($esQuery)->asArray();
-
-        $this->lastRecordCount = $resultSet['hits']['total']['value'];
-
-        $results = [];
-
-        foreach ($resultSet['hits']['hits'] as $hit) {
-            $results[]['o_id'] = $hit['_id'];
-        }
-
-        return $results;
+        return $esClient->search($esQuery)->asArray();
     }
 
     /**

@@ -279,6 +279,15 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
         return $this->objects;
     }
 
+    public function loadRawData(bool $all = true): array
+    {
+        $queryBuilder = $this->dao->createQueryBuilder();
+        $this->addQueryFromConditions($queryBuilder);
+        $this->addOrderBy($queryBuilder);
+
+        return $this->dao->loadSet($queryBuilder, true, $all);
+    }
+
     protected function loadElementById($elementId)
     {
         return AbstractObject::getById($elementId);
