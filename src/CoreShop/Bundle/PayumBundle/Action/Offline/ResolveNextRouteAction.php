@@ -21,6 +21,11 @@ use Payum\Core\Action\ActionInterface;
 
 final class ResolveNextRouteAction implements ActionInterface
 {
+    const STORES = [
+        'RelovedUK' => 'uk',
+        'RelovedEU' => 'eu'
+    ];
+
     /**
      * @inheritdoc
      *
@@ -32,8 +37,11 @@ final class ResolveNextRouteAction implements ActionInterface
         $order = $payment->getOrder();
 
         if ($order instanceof OrderInterface) {
+            $_store = self::STORES[$order->getStore()->getName()];
+
             $request->setRouteName('coreshop_checkout_thank_you');
             $request->setRouteParameters([
+                '_store' => $_store,
                 '_locale' => $order->getLocaleCode(),
                 'token' => $order->getToken(),
             ]);

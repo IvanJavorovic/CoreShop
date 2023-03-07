@@ -15,10 +15,13 @@ declare(strict_types=1);
 namespace CoreShop\Component\Wishlist\Factory;
 
 use CoreShop\Component\Resource\Factory\FactoryInterface;
+use CoreShop\Component\Store\Context\StoreContextInterface;
 
 class WishlistFactory implements FactoryInterface
 {
-    public function __construct(private FactoryInterface $wishlistFactory)
+    public function __construct(
+        private FactoryInterface $wishlistFactory
+    )
     {
     }
 
