@@ -55,9 +55,14 @@ class Dao
     {
         $resultSet = $this->loadSet($queryBuilder);
 
-        $this->lastRecordCount = $resultSet['hits']['total']['value'];
-
         $results = [];
+
+        if (empty($resultSet)) {
+            $this->lastRecordCount = 0;
+            return $results;
+        }
+
+        $this->lastRecordCount = $resultSet['hits']['total']['value'];
 
         foreach ($resultSet['hits']['hits'] as $hit) {
             $results[]['o_id'] = $hit['_id'];
