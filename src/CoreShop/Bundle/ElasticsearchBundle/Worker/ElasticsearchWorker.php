@@ -387,6 +387,19 @@ class ElasticsearchWorker extends AbstractWorker
 
     public function deleteFromIndex(IndexInterface $index, IndexableInterface $object): void
     {
+        $this->deleteFromMainTable($index, $object);
+        $this->deleteFromRelationalIndex($index, $object);
+        $this->deleteFromLocalizedIndex($index, $object);
+
+        $languages = Tool::getValidLanguages();
+
+        foreach ($languages as $language) {
+            $this->deleteFromLocalizedViewIndex($index, $object, $language);
+        }
+    }
+
+    public function deleteFromMainTable(IndexInterface $index, IndexableInterface $object): void
+    {
         $params = [
             'index' => $this->getTablename($index->getName()),
             'type' => 'coreshop',
@@ -404,6 +417,38 @@ class ElasticsearchWorker extends AbstractWorker
     {
         $params = [
             'index' => $this->getRelationTablename($index->getName()),
+            'type' => 'coreshop',
+            'source' => [
+                'src' => $object->getId()
+            ]
+        ];
+
+        try {
+            $this->client->delete($params);
+        } catch (\Exception $e) {
+            $this->logger->info((string)$e);
+        }
+    }
+
+    public function deleteFromLocalizedIndex(IndexInterface $index, IndexableInterface $object): void
+    {
+        $params = [
+            'index' => $this->getLocalizedTablename($index->getName()),
+            'type' => 'coreshop',
+            'id' => $object->getId()
+        ];
+
+        try {
+            $this->client->delete($params);
+        } catch (\Exception $e) {
+            $this->logger->info((string)$e);
+        }
+    }
+
+    public function deleteFromLocalizedViewIndex(IndexInterface $index, IndexableInterface $object, string $language): void
+    {
+        $params = [
+            'index' => $this->getLocalizedViewName($index->getName(), $language),
             'type' => 'coreshop',
             'id' => $object->getId()
         ];

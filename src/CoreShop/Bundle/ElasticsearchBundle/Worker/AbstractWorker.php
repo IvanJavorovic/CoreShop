@@ -178,6 +178,8 @@ abstract class AbstractWorker implements WorkerInterface
                 }
             } catch (\Exception $e) {
                 $this->logger->error('Exception in CoreShopIndexService: ' . $e->getMessage(), [$e]);
+                AbstractObject::setHideUnpublished($hidePublishedMemory);
+                DataObject::setGetInheritedValues($oldGetInheritedValues);
 
                 throw $e;
             }
