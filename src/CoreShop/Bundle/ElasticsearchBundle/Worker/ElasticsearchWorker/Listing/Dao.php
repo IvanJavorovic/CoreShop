@@ -111,8 +111,32 @@ class Dao
         $esQuery['from'] = $this->model->getOffset() ?? 0;
         $esQuery['index'] = $this->model->getQueryTableName();
         $esQuery['type'] = "coreshop";
-        $esQuery['body']['sort'] = [
-            $this->model->getOrderKey() => $this->model->getOrder()
+
+        if ($this->model->getSortByScore() === true) {
+            $esQuery['body']['sort'][$this->model->getOrderKey()] = [
+                'order' => $this->model->getOrder()
+            ];
+
+            $esQuery['body']['sort']['_score'] = [
+                'order' => 'desc'
+            ];
+
+            $esQuery['size'] = 1;
+            $esQuery['body']['query'] = $esQuery['query'];
+            $esQuery['track_scores'] = true;
+            unset($esQuery['query']);
+
+            $maxScore = $esClient->search($esQuery)->asArray()['hits']['max_score'];
+            $minScore = $maxScore * 0.9;
+
+            $esQuery['size'] = ($withSource && $all) ? 10000 : ($this->model->getLimit() ?? 0);
+            $esQuery['body']['min_score'] = $minScore;
+
+            return $esClient->search($esQuery)->asArray();
+        }
+
+        $esQuery['body']['sort'][$this->model->getOrderKey()] = [
+            'order' => $this->model->getOrder()
         ];
 
         $esQuery['body']['query'] = $esQuery['query'];
@@ -146,11 +170,68 @@ class Dao
 
             $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
 
+            if ($this->model->getSortByScore() === true) {
+                try {
+                    $esQuery = $esClient->sql()->translate($params)->asArray();
+                } catch (\Exception $exception) {
+                    return [];
+                }
+
+                $esQuery['_source'] = true;
+                $esQuery['from'] = 0;
+                $esQuery['index'] = $this->model->getQueryTableName();
+                $esQuery['type'] = "coreshop";
+
+                $esQuery['size'] = 1;
+                $esQuery['body']['query'] = $esQuery['query'];
+                $esQuery['track_scores'] = true;
+                unset($esQuery['query']);
+
+                $maxScore = $esClient->search($esQuery)->asArray()['hits']['max_score'];
+                $minScore = $maxScore * 0.9;
+
+                $esQuery['size'] = 10000;
+                $esQuery['body']['min_score'] = $minScore;
+
+                $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
+                $groupedValues = $this->mapHitResults($esClient->search($esQuery)->asArray(), $fieldName);
+
+                return array_values(array_filter($mappedResults, function ($item) use ($groupedValues) {
+                    return in_array($item['value'], $groupedValues);
+                }));
+            }
+
             return $this->mapResults($esClient->sql()->query($params)->asArray());
         }
 
         $queryBuilder->select($this->quoteIdentifier($fieldName));
         $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
+
+        if ($this->model->getSortByScore() === true) {
+            try {
+                $esQuery = $esClient->sql()->translate($params)->asArray();
+            } catch (\Exception $exception) {
+                return [];
+            }
+
+            $esQuery['_source'] = true;
+            $esQuery['from'] = 0;
+            $esQuery['index'] = $this->model->getQueryTableName();
+            $esQuery['type'] = "coreshop";
+
+            $esQuery['size'] = 1;
+            $esQuery['body']['query'] = $esQuery['query'];
+            $esQuery['track_scores'] = true;
+            unset($esQuery['query']);
+
+            $maxScore = $esClient->search($esQuery)->asArray()['hits']['max_score'];
+            $minScore = $maxScore * 0.9;
+
+            $esQuery['size'] = 10000;
+            $esQuery['body']['min_score'] = $minScore;
+
+            return $this->mapHitResults($esClient->search($esQuery)->asArray(), $fieldName);
+        }
 
         $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
 
@@ -202,13 +283,44 @@ class Dao
                 }
             }
 
-            $params['body']['query'] = $this->formatQueryParams($subQueryBuilder->getSQL());;
+            $params['body']['query'] = $this->formatQueryParams($subQueryBuilder->getSQL());
 
-            $srcs = $esClient->sql()->query($params)->asArray();
+            if ($this->model->getSortByScore() === true) {
+                try {
+                    $esQuery = $esClient->sql()->translate($params)->asArray();
+                } catch (\Exception $exception) {
+                    return [];
+                }
 
-            $srcIds = array_map(function ($item) {
-                return $item[0];
-            }, $srcs['rows']);
+                $esQuery['body']['sort'][$this->model->getOrderKey()] = [
+                    'order' => $this->model->getOrder()
+                ];
+
+                $esQuery['_source'] = true;
+                $esQuery['from'] = 0;
+                $esQuery['index'] = $this->model->getQueryTableName();
+                $esQuery['type'] = "coreshop";
+
+                $esQuery['size'] = 1;
+                $esQuery['body']['query'] = $esQuery['query'];
+                $esQuery['track_scores'] = true;
+                unset($esQuery['query']);
+                unset($esQuery['sort']);
+
+                $maxScore = $esClient->search($esQuery)->asArray()['hits']['max_score'];
+                $minScore = $maxScore * 0.9;
+
+                $esQuery['size'] = 10000;
+                $esQuery['body']['min_score'] = $minScore;
+
+                $srcIds = $this->mapHitResults($esClient->search($esQuery)->asArray(), 'o_id');
+            } else {
+                $srcs = $esClient->sql()->query($params)->asArray();
+
+                $srcIds = array_map(function ($item) {
+                    return $item[0];
+                }, $srcs['rows']);
+            }
 
             if (count($srcIds)) {
                 $srcIds = implode(',', $srcIds);
@@ -236,11 +348,42 @@ class Dao
 
         $params['body']['query'] = $this->formatQueryParams($subQueryBuilder->getSQL());
 
-        $srcs = $esClient->sql()->query($params)->asArray();
+        if ($this->model->getSortByScore() === true) {
+            try {
+                $esQuery = $esClient->sql()->translate($params)->asArray();
+            } catch (\Exception $exception) {
+                return [];
+            }
 
-        $srcIds = array_map(function ($item) {
-            return $item[0];
-        }, $srcs['rows']);
+            $esQuery['body']['sort'][$this->model->getOrderKey()] = [
+                'order' => $this->model->getOrder()
+            ];
+
+            $esQuery['_source'] = true;
+            $esQuery['from'] = 0;
+            $esQuery['index'] = $this->model->getQueryTableName();
+            $esQuery['type'] = "coreshop";
+
+            $esQuery['size'] = 1;
+            $esQuery['body']['query'] = $esQuery['query'];
+            $esQuery['track_scores'] = true;
+            unset($esQuery['query']);
+            unset($esQuery['sort']);
+
+            $maxScore = $esClient->search($esQuery)->asArray()['hits']['max_score'];
+            $minScore = $maxScore * 0.9;
+
+            $esQuery['size'] = 10000;
+            $esQuery['body']['min_score'] = $minScore;
+
+            $srcIds = $this->mapHitResults($esClient->search($esQuery)->asArray(), 'o_id');
+        } else {
+            $srcs = $esClient->sql()->query($params)->asArray();
+
+            $srcIds = array_map(function ($item) {
+                return $item[0];
+            }, $srcs['rows']);
+        }
 
         if (count($srcIds)) {
             $srcIds = implode(',', $srcIds);
@@ -315,6 +458,17 @@ class Dao
                 $columnName = $results['columns'][$columnKey]['name'];
                 $mappedResults[$rowKey][$columnName] = $rowVal;
             }
+        }
+
+        return $mappedResults;
+    }
+
+    public function mapHitResults(array $results, string $fieldName): array
+    {
+        $mappedResults = [];
+
+        foreach ($results['hits']['hits'] as $row) {
+            $mappedResults[] = $row['_source'][$fieldName];
         }
 
         return $mappedResults;
