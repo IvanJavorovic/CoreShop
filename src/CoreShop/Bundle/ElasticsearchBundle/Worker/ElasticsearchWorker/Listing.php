@@ -290,6 +290,11 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
         return $this->dao->loadSet($queryBuilder, true, $all);
     }
 
+    public function getSuggestions(string $searchTerm = '', array $fieldNames = [], int $numOfSuggestions = 1): array
+    {
+        return $this->dao->getSuggestions($searchTerm, $fieldNames, $numOfSuggestions);
+    }
+
     protected function loadElementById($elementId)
     {
         return AbstractObject::getById($elementId);

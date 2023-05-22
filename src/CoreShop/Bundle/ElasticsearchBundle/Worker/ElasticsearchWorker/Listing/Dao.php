@@ -145,6 +145,42 @@ class Dao
         return $esClient->search($esQuery)->asArray();
     }
 
+    /* Returns "phrase" suggestions based on entered search term, suggestion results are sorted by score */
+    public function getSuggestions(string $searchTerm = '', array $fieldNames = [], int $numOfSuggestions = 1): array
+    {
+        $esClient = $this->model->getWorker()->getElasticsearchClient();
+
+        $esQuery['_source'] = false;
+        $esQuery['index'] = $this->model->getQueryTableName();
+        $esQuery['type'] = "coreshop";
+        $esQuery['body']['suggest']['text'] = $searchTerm;
+
+        foreach ($fieldNames as $fieldName) {
+            $esQuery['body']['suggest']["{$fieldName}_suggestions"] = [
+                'phrase' => [
+                    'field' => $fieldName,
+                    'size' => $numOfSuggestions
+                ]
+            ];
+        }
+
+        $response = $esClient->search($esQuery)->asArray();
+
+        $suggestions = [];
+
+        foreach ($response['suggest'] as $suggest) {
+            foreach ($suggest as $suggestion) {
+                $suggestions = array_merge($suggestions, $suggestion['options']);
+            }
+        }
+
+        usort($suggestions, function ($item1, $item2) {
+            return $item2['score'] <=> $item1['score'];
+        });
+
+        return array_slice($suggestions, 0, $numOfSuggestions);
+    }
+
     /**
      * Load Group by values.
      *
@@ -446,7 +482,8 @@ class Dao
 
     protected function formatQueryParams(string $sqlQuery): string
     {
-        return str_replace('`', '', $sqlQuery);
+        $sqlQuery = str_replace('`', '', $sqlQuery);
+        return str_replace("\'", '', $sqlQuery);
     }
 
     public function mapResults(array $results): array
