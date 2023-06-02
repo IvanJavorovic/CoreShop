@@ -85,6 +85,8 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
 
     protected WorkerInterface $worker;
 
+    protected bool $sortByScore = false;
+
     public function __construct(IndexInterface $index, WorkerInterface $worker, Connection $connection)
     {
         parent::__construct($index, $worker);
@@ -286,6 +288,11 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
         $this->addOrderBy($queryBuilder);
 
         return $this->dao->loadSet($queryBuilder, true, $all);
+    }
+
+    public function getSuggestions(string $searchTerm = '', array $fieldNames = [], int $numOfSuggestions = 1): array
+    {
+        return $this->dao->getSuggestions($searchTerm, $fieldNames, $numOfSuggestions);
     }
 
     protected function loadElementById($elementId)
@@ -540,5 +547,15 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
     public function valid(): bool
     {
         return $this->current() !== false;
+    }
+
+    public function getSortByScore(): bool
+    {
+        return $this->sortByScore;
+    }
+
+    public function setSortByScore(bool $sortByScore): void
+    {
+        $this->sortByScore = $sortByScore;
     }
 }

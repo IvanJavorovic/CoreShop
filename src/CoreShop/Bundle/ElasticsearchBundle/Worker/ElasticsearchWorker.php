@@ -439,13 +439,17 @@ class ElasticsearchWorker extends AbstractWorker
         $params = [
             'index' => $this->getRelationTablename($index->getName()),
             'type' => 'coreshop',
-            'source' => [
-                'src' => $object->getId()
+            'body' => [
+                'query' => [
+                    "match" => [
+                        'src' => $object->getId()
+                    ]
+                ]
             ]
         ];
 
         try {
-            $this->client->delete($params);
+            $this->client->deleteByQuery($params);
         } catch (\Exception $e) {
             $this->logger->info((string)$e);
         }
