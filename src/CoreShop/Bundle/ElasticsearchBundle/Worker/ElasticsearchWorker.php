@@ -314,7 +314,28 @@ class ElasticsearchWorker extends AbstractWorker
 
     protected function handleArrayValues(IndexInterface $index, array $value)
     {
+        try {
+            implode(',', $value);
+        } catch (\Exception $e){
+            $value = $this->array_flatten($value);
+        }
         return ',' . implode(',', $value) . ',';
+    }
+
+    private function array_flatten($array) {
+        if (!is_array($array)) {
+            return [];
+        }
+        $result = array();
+        foreach ($array as $key => $value) {
+            if (is_array($value)) {
+                $result = array_merge($result, $this->array_flatten($value));
+            }
+            else {
+                $result[$key] = $value;
+            }
+        }
+        return $result;
     }
 
     public function deleteIndexStructures(IndexInterface $index)
