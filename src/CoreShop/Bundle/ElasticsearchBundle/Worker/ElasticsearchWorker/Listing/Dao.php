@@ -18,6 +18,7 @@ use CoreShop\Bundle\ElasticsearchBundle\Worker\ElasticsearchWorker;
 use CoreShop\Component\Index\Listing\ListingInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
+use function PHPUnit\Framework\stringContains;
 
 class Dao
 {
@@ -154,31 +155,89 @@ class Dao
         $esQuery['index'] = $this->model->getQueryTableName();
         $esQuery['type'] = "coreshop";
         $esQuery['body']['suggest']['text'] = $searchTerm;
+        $words = explode(' ', $searchTerm);
 
         foreach ($fieldNames as $fieldName) {
-            $esQuery['body']['suggest']["{$fieldName}_suggestions"] = [
+            $esQuery['body']['suggest']["{$fieldName}_phrase_suggestions"] = [
                 'phrase' => [
                     'field' => $fieldName,
                     'size' => $numOfSuggestions
                 ]
             ];
+
+            foreach ($words as $key => $word) {
+                $esQuery['body']['suggest']["{$fieldName}_term_suggestions_{$key}"] = [
+                    'text' => $word,
+                    'term' => [
+                        'field' => $fieldName,
+                        'size' => $numOfSuggestions
+                    ]
+                ];
+            }
         }
 
         $response = $esClient->search($esQuery)->asArray();
 
-        $suggestions = [];
+        $phraseSuggestions = [];
 
-        foreach ($response['suggest'] as $suggest) {
+        foreach ($response['suggest'] as $suggestField => $suggest) {
             foreach ($suggest as $suggestion) {
-                $suggestions = array_merge($suggestions, $suggestion['options']);
+                if (str_contains($suggestField, '_phrase_')) {
+                    $phraseSuggestions = array_merge($phraseSuggestions, $suggestion['options']);
+                }
             }
         }
 
-        usort($suggestions, function ($item1, $item2) {
+        usort($phraseSuggestions, function ($item1, $item2) {
             return $item2['score'] <=> $item1['score'];
         });
 
-        return array_slice($suggestions, 0, $numOfSuggestions);
+        $phraseSuggestions = array_slice($phraseSuggestions, 0, $numOfSuggestions);
+
+        if (!empty($phraseSuggestions)) {
+            return $phraseSuggestions;
+        }
+
+        $termSuggestions = [];
+
+        foreach ($response['suggest'] as $suggestField => $suggest) {
+            foreach ($suggest as $suggestion) {
+                if (str_contains($suggestField, '_term_')) {
+                    if (empty($termSuggestions[$suggestion['text']])) {
+                        $termSuggestions[$suggestion['text']] = [];
+                    }
+
+                    $termSuggestions[$suggestion['text']] = array_merge($termSuggestions[$suggestion['text']], $suggestion['options']);
+                }
+            }
+        }
+
+        foreach ($words as $key => $word) {
+            $wordSuggestions = $termSuggestions[$word];
+
+            if (empty($wordSuggestions)) {
+                continue;
+            }
+
+            usort($wordSuggestions, function ($item1, $item2) {
+                return $item2['score'] <=> $item1['score'];
+            });
+
+            if ($wordSuggestions[0]['score'] < .75) {
+                continue;
+            }
+
+            $words[$key] = $wordSuggestions[0]['text'];
+        }
+
+        $termSuggestions = [
+            [
+                'text' => implode(' ', $words),
+                'score' => 1
+            ]
+        ];
+
+        return $termSuggestions;
     }
 
     /**
