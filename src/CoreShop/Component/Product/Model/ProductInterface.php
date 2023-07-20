@@ -14,12 +14,11 @@ declare(strict_types=1);
 
 namespace CoreShop\Component\Product\Model;
 
-use CoreShop\Component\Pimcore\Slug\SluggableInterface;
 use CoreShop\Component\Resource\Model\ToggleableInterface;
 use CoreShop\Component\Resource\Pimcore\Model\PimcoreModelInterface;
 use Pimcore\Model\Asset\Image;
 
-interface ProductInterface extends PimcoreModelInterface, ToggleableInterface, SluggableInterface
+interface ProductInterface extends PimcoreModelInterface, ToggleableInterface
 {
     public function getSku(): ?string;
 
