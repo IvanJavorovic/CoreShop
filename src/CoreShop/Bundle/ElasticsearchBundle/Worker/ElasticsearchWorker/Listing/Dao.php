@@ -264,6 +264,7 @@ class Dao
             }
 
             $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
+            $params['body']['fetch_size'] = 10000;
 
             if ($this->model->getSortByScore() === true) {
                 try {
@@ -328,6 +329,7 @@ class Dao
             return $this->mapHitResults($esClient->search($esQuery)->asArray(), $fieldName);
         }
 
+        $params['body']['fetch_size'] = 10000;
         $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
 
         return array_map(function (array $mappedData) use ($fieldName) {
@@ -379,6 +381,7 @@ class Dao
             }
 
             $params['body']['query'] = $this->formatQueryParams($subQueryBuilder->getSQL());
+            $params['body']['fetch_size'] = 10000;
 
             if ($this->model->getSortByScore() === true) {
                 try {
@@ -411,7 +414,6 @@ class Dao
                 $srcIds = $this->mapHitResults($esClient->search($esQuery)->asArray(), 'o_id');
             } else {
                 $srcs = $esClient->sql()->query($params)->asArray();
-
                 $srcIds = array_map(function ($item) {
                     return $item[0];
                 }, $srcs['rows']);
@@ -442,6 +444,7 @@ class Dao
         $subQueryBuilder->where($queryBuilder->getQueryPart('where'));
 
         $params['body']['query'] = $this->formatQueryParams($subQueryBuilder->getSQL());
+        $params['body']['fetch_size'] = 10000;
 
         if ($this->model->getSortByScore() === true) {
             try {
