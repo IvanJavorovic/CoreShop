@@ -421,7 +421,7 @@ class Listing extends AbstractListing implements OrderAwareListingInterface, Ext
                     $subQuerySql = "SELECT src FROM {$relationalTableName} q WHERE {$cond} GROUP BY src";
                     $params['body']['query'] = str_replace('`', '', $subQuerySql);
 
-                    $srcs = $esClient->sql()->query($params)->asArray();
+                    $srcs = $this->dao->paginateElasticSQLResults($esClient, $params);
 
                     $srcIds = array_map(function ($item) {
                         return $item[0];

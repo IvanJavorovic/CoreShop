@@ -18,7 +18,8 @@ use CoreShop\Bundle\ElasticsearchBundle\Worker\ElasticsearchWorker;
 use CoreShop\Component\Index\Listing\ListingInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
-use function PHPUnit\Framework\stringContains;
+use Elastic\Elasticsearch\Client;
+use Pimcore\Log\Simple;
 
 class Dao
 {
@@ -133,7 +134,7 @@ class Dao
             $esQuery['size'] = ($withSource && $all) ? 10000 : ($this->model->getLimit() ?? 0);
             $esQuery['body']['min_score'] = $minScore;
 
-            return $esClient->search($esQuery)->asArray();
+            return $this->paginateElasticResults($esClient, $esQuery);
         }
 
         $esQuery['body']['sort'][$this->model->getOrderKey()] = [
@@ -143,7 +144,7 @@ class Dao
         $esQuery['body']['query'] = $esQuery['query'];
         unset($esQuery['query']);
 
-        return $esClient->search($esQuery)->asArray();
+        return $this->paginateElasticResults($esClient, $esQuery);
     }
 
     /* Returns "phrase" suggestions based on entered search term, suggestion results are sorted by score */
@@ -289,15 +290,15 @@ class Dao
                 $esQuery['size'] = 10000;
                 $esQuery['body']['min_score'] = $minScore;
 
-                $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
-                $groupedValues = $this->mapHitResults($esClient->search($esQuery)->asArray(), $fieldName);
+                $mappedResults = $this->mapResults($this->paginateElasticSQLResults($esClient, $params));
+                $groupedValues = $this->mapHitResults($this->paginateElasticResults($esClient, $esQuery), $fieldName);
 
                 return array_values(array_filter($mappedResults, function ($item) use ($groupedValues) {
                     return in_array($item['value'], $groupedValues);
                 }));
             }
 
-            return $this->mapResults($esClient->sql()->query($params)->asArray());
+            return $this->mapResults($this->paginateElasticSQLResults($esClient, $params));
         }
 
         $queryBuilder->select($this->quoteIdentifier($fieldName));
@@ -326,11 +327,11 @@ class Dao
             $esQuery['size'] = 10000;
             $esQuery['body']['min_score'] = $minScore;
 
-            return $this->mapHitResults($esClient->search($esQuery)->asArray(), $fieldName);
+            return $this->mapHitResults($this->paginateElasticResults($esClient, $esQuery), $fieldName);
         }
 
         $params['body']['fetch_size'] = 10000;
-        $mappedResults = $this->mapResults($esClient->sql()->query($params)->asArray());
+        $mappedResults = $this->mapResults($this->paginateElasticSQLResults($esClient, $params));
 
         return array_map(function (array $mappedData) use ($fieldName) {
             return str_replace(',', '', (string)$mappedData[$fieldName]);
@@ -411,9 +412,11 @@ class Dao
                 $esQuery['size'] = 10000;
                 $esQuery['body']['min_score'] = $minScore;
 
-                $srcIds = $this->mapHitResults($esClient->search($esQuery)->asArray(), 'o_id');
+                $srcIds = $this->mapHitResults($this->paginateElasticResults($esClient, $esQuery), 'o_id');
             } else {
-                $srcs = $esClient->sql()->query($params)->asArray();
+                $params['body']['fetch_size'] = 10000;
+                $srcs = $this->paginateElasticSQLResults($esClient, $params);
+
                 $srcIds = array_map(function ($item) {
                     return $item[0];
                 }, $srcs['rows']);
@@ -428,7 +431,7 @@ class Dao
 
             $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
 
-            return $this->mapResults($esClient->sql()->query($params)->asArray());
+            return $this->mapResults($this->paginateElasticSQLResults($esClient, $params));
         }
 
         $queryBuilder->select($this->quoteIdentifier('dest'));
@@ -474,9 +477,9 @@ class Dao
             $esQuery['size'] = 10000;
             $esQuery['body']['min_score'] = $minScore;
 
-            $srcIds = $this->mapHitResults($esClient->search($esQuery)->asArray(), 'o_id');
+            $srcIds = $this->mapHitResults($this->paginateElasticResults($esClient, $esQuery), 'o_id');
         } else {
-            $srcs = $esClient->sql()->query($params)->asArray();
+            $srcs = $this->paginateElasticSQLResults($esClient, $params);
 
             $srcIds = array_map(function ($item) {
                 return $item[0];
@@ -492,7 +495,7 @@ class Dao
 
         $params['body']['query'] = $this->formatQueryParams($queryBuilder->getSQL());
 
-        $queryResult = $this->mapResults($esClient->sql()->query($params)->asArray());
+        $queryResult = $this->mapResults($this->paginateElasticSQLResults($esClient, $params));
 
         $result = [];
 
@@ -643,6 +646,45 @@ class Dao
         }*/
 
         return '';
+    }
+
+    public function paginateElasticSQLResults(Client $esClient, array $params): array
+    {
+        $results = $esClient->sql()->query($params)->asArray();
+        $allResults = $results;
+
+        while (!empty($results['cursor'])) {
+            $params['body']['cursor'] = $results['cursor'];
+            $results = $esClient->sql()->query($params)->asArray();
+
+            $allResults = array_merge_recursive($allResults, $results);
+        }
+
+        if (!empty($allResults['cursor'])) {
+            unset($allResults['cursor']);
+        }
+
+        return $allResults;
+    }
+
+    public function paginateElasticResults(Client $esClient, array $esQuery): array
+    {
+        $results = $esClient->search($esQuery)->asArray();
+
+        if ($esQuery['size'] === 10000) {
+            $hits = $results['hits']['hits'] ?? [];
+
+            while (count($hits) < $results['hits']['total']['value']) {
+                $esQuery['body']['search_after'] = [$hits[array_key_last($hits)]['_id']];
+                $results = $esClient->search($esQuery)->asArray();
+
+                $hits = array_merge_recursive($hits, $results['hits']['hits']);
+            }
+
+            $results['hits']['hits'] = $hits;
+        }
+
+        return $results;
     }
 
     /**
